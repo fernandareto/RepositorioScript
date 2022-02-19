@@ -152,10 +152,6 @@ for index,date in enumerate(fechas):
         
         print('ya fue notificado el proveedor')    
         
-
-
-#seacrh mail recibido
-
 #hace la conexión a la BD para obtener los proveedores de los cuales no se ha recibido correo
 conexion = mysql.connector.connect(host = 'sql10.freesqldatabase.com',port = 3306, user = 'sql10473104', password= 'WXqzNP2trR', database = 'sql10473104')
 cursorr = conexion.cursor()
