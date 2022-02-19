@@ -183,7 +183,6 @@ for proveedor in proveedores_notificados:
             parts = payload.get("parts")[0]
             data = parts['body']['data']
             
-           
             if headers:
             # obtiene información del correo electronico encontrado
                 for header in headers:
