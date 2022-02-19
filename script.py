@@ -27,7 +27,7 @@ import io
 import sys
 
 
-####Codigo GOOGLE
+####Codigo GOOGLE para obtener el servicio con el api de gmail###
 def Create_Service(client_secret_file, api_name, api_version, *scopes):
     print(client_secret_file, api_name, api_version, scopes, sep='-')
     CLIENT_SECRET_FILE = client_secret_file
@@ -68,23 +68,17 @@ def convert_to_RFC_datetime(year=1900, month=1, day=1, hour=0, minute=0):
     dt = datetime.datetime(year, month, day, hour, minute, 0).isoformat() + 'Z'
     return dt
 
-
-
-
-##INICIO CODIGO FUNCIONAL
-
-#autentica para enviar correos desde la cuenta gmail
+#Crea el servicio de gmail y el token de autenticaciòn para enviar correos desde la cuenta gmail 
 CLIENT_SECRET_FILE = 'client_secret.json'
 API_NAME = 'gmail'
 API_VERSION = 'v1'
 SCOPES = ['https://mail.google.com/']
 
 service = Create_Service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
-print(service)
 
-#autentica para leer el archivo sheet
+#autenticación para leer el archivo sheet de drive
 gc = gspread.service_account(filename='proyecto-341313-f7fe5a0f69b4.json')
-#lee el archivo datos que esta en drive
+#abrir el archivo en drive donde se encuentran los datos
 sh = gc.open("datos")
 
 workshet = sh.get_worksheet(0)
@@ -94,10 +88,8 @@ datos = workshet.get_all_values()
 
 dataframe= pd.DataFrame(workshet.get_all_records())
 
-#obtiene los datos necesarios del archivo sheet
+#obtiene los datos necesarios del archivo sheet para realizar las busquedas
 tabla= dataframe.iloc[:,[0,1,2,3,6]]
-print(tabla)
-
 
 mails = (dataframe['contacto_proveedor'])
 fechas = (dataframe['fecha_vencimiento'])
@@ -115,7 +107,7 @@ listasincomas = str(identificadores)[1:-1]
 print(listasincomas)
 
 
-#hace la busqueda de los terceros que tienen su fecha de vencimiento de aoc en 10 días a partir del día que se corre el script
+#Busca de los terceros que tienen su fecha de vencimiento de aoc en 10 días a partir del día que se corre el script
 for index,date in enumerate(fechas):
     format = '%Y-%m-%d'
     daysexpiration = 10
@@ -134,100 +126,87 @@ for index,date in enumerate(fechas):
             datesendmail = datetime.today().strftime("%Y-%m-%d")
 
             if mailcontacto !='':
-            # print (identidadter,terceropro, servicioter,datetocompare,mailcontacto, datesendmail)
         #envia el mensaje a los terceros que se encuentran dentro del plazo de 10 días para vencer su AOC        
                 emailMsg = 'Su AoC Se encuentra proximo a vencer, por favor remita su AoC actualizado'
                 mimeMessage = MIMEMultipart()
                 mimeMessage['to'] = mailcontacto
-                mimeMessage['subject'] = 'AoC Proximo a vencer - Mercado Libre'
+                mimeMessage['subject'] = 'AoC Proximo a vencer '
                 mimeMessage.attach(MIMEText(emailMsg, 'plain'))
                 raw_string = base64.urlsafe_b64encode(mimeMessage.as_bytes()).decode()
                 message = service.users().messages().send(userId='me', body={'raw': raw_string}).execute()
-                print ('enviado')
-            #inserta los valores asociados a los correos que ha notificado que se va a vencer su aoc en la base de datos mysql en tabla proveedores_notificados
+            #inserta los valores asociados a los correos que ha notificado que se va a vencer su AoC en la base de datos mysql en tabla proveedores_notificados
                 cursorr = conexion.cursor()
                 cursorr.execute("INSERT INTO proveedores_notificados (identificador, nombre, servicio, fecha_vencimiento_aoc, correo_contacto, fecha_notificacion) VALUES ('{}','{}','{}','{}','{}','{}')".format(identidadter,terceropro,servicioter,datetocompare,mailcontacto,datesendmail))
                 conexion.commit()
-                print("registro insertado con exito")
-
+            #Notifica cuando un correo no se encuentra el archivo sheet donde esta la información de los terceros
             else:
-                emailMsg = 'No existe correo para contactar al proveedor'+ terceropro
+                emailMsg = 'No existe correo para contactar al proveedor' + terceropro
                 mimeMessage = MIMEMultipart()
                 mimeMessage['to'] = 'retomeli2022@gmail.com'
                 mimeMessage['subject'] = 'No se logro notificar el vencimiento de AoC'
                 mimeMessage.attach(MIMEText(emailMsg, 'plain'))
                 raw_string = base64.urlsafe_b64encode(mimeMessage.as_bytes()).decode()
                 message = service.users().messages().send(userId='me', body={'raw': raw_string}).execute()
-                print ('nitificado')
+                
     else:
         
-        print('ya fueron notificado')    
+        print('ya fue notificado el proveedor')    
         
 
 
 #seacrh mail recibido
 
+#hace la conexión a la BD para obtener los proveedores de los cuales no se ha recibido correo
 conexion = mysql.connector.connect(host = 'sql10.freesqldatabase.com',port = 3306, user = 'sql10473104', password= 'WXqzNP2trR', database = 'sql10473104')
-print(conexion)
-
 cursorr = conexion.cursor()
 cursorr.execute("SELECT identificador,nombre FROM proveedores_notificados WHERE Estado=0")
 proveedores_notificados=cursorr.fetchall()
 
-
+#recorre los id de los proveedores a los cuales se les notifico que su AoC esta pròximo a vencer
 for proveedor in proveedores_notificados:
-    #print (proveedor[0])
-    #print (proveedor[1])
     idproveedor = proveedor[0]
     nombreproveedor = proveedor[1]
-    #renovacion = 'RenovacionAOC'
     
-    #busco el id o cantidad de los correos que encuentra con ese asunto
+    #Busca los correos que se reciben con el asunto nombreproveedor+renovacion de AoC+idproveedor
     search_ids = service.users().messages().list(userId='me', q=(nombreproveedor+'-renovacion de AoC-'+str(idproveedor))).execute()
-    #print (nombreproveedor)
     number_results = search_ids['resultSizeEstimate']
-      
-    #print (search_ids['resultSizeEstimate'])
 
-#numberresult es la cantidad de mensajes que encontro por ese asunto q
+    #Valida si encontro correos con el asunto 
     if number_results == 1:
         idsmail= search_ids['messages']
-        ##si encuentra 1 mensaje con ese asunto 1 haga eso:
+        
         if len(idsmail)==1:
             for msg_id in idsmail:
-                print (msg_id['id']) #tomo el ID del mensaje que encontro con el asunto q
+                print (msg_id['id']) #obtiene el ID del mensaje que encontro
 
             msg = service.users().messages().get(userId='me', id=msg_id['id'], format='full').execute()
-            # parts can be the message body, or attachments
+            # divide el mensaje que encontro
             payload = msg['payload']
             headers = payload.get("headers")
-            #parts = payload.get("parts")
+            
             parts = payload.get("parts")[0]
             data = parts['body']['data']
             
-            #has_subject = False
+           
             if headers:
-            # this section prints email basic info & creates a folder for the email
+            # obtiene información del correo electronico encontrado
                 for header in headers:
                     name = header.get("name")
                     value = header.get("value")
                     if name.lower() == 'from':
-                        # we print the From address
-                        #print("From:", value)
+                      
                         frommail=value
                         print(frommail)
                     if name.lower() == "to":
-                        # we print the To address
-                        #print("To:", value)
+                       
                         tomail=value
                         print(tomail)
                     if name.lower() == "subject":
-                        # make our boolean True, the email has "subject"
-                        #print("Subject:", value)
+                       
                         subjectmail=value
                         print(subjectmail)
                     if name.lower() == "date":
-                        #print("Date:", value)
+                       
                         datemail=value
                         print(datemail)
 
@@ -239,10 +218,10 @@ for proveedor in proveedores_notificados:
                 body = soup.body()   
                 print(str(body))    
                                   
-                    
+            #agrega la información que se obtiene del correo a la BD y coloca en 1 el Estado de cada proveedor en la BD para identificar cuales ya dieron respuesta        
             cursorr.execute("UPDATE proveedores_notificados SET Estado='{}',Remitente='{}',Fecha_Respuesta_Proveedor='{}',Fecha_Actualizada_AOC='{}' WHERE identificador={}".format(1,frommail,datemail,str(body),idproveedor)) 
             conexion.commit()   
-            print('cambioestado')        
+                  
     else: 
         
         print ('No hay mensajes recibidos por parte de los proveedores a los cuales se notifico que se va a vencer su AoC')
