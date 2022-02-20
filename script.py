@@ -181,10 +181,10 @@ for proveedor in proveedores_notificados:
     
     
     #Valida si encontro correos con el asunto especifíco
-    if number_results > 1:
+    if number_results >= 1:
         idsmail= search_ids['messages']
         
-        if len(idsmail)>1:
+        if len(idsmail)>=1:
             for search_id in idsmail:
                 messageid = search_id['id']
                 messagesubject = '(has:attachment)({0})'.format(messageid)
@@ -211,7 +211,7 @@ for proveedor in proveedores_notificados:
                     if 'parts' in messageDetailPayload:
                         for msgPayload in messageDetailPayload['parts']:
                             mime_type = msgPayload['mimeType'] 
-                            file_name = msgPayload['filename']
+                            file_name = str(idproveedor)+'-'+str(datemail)+'.pdf'
                             body = msgPayload['body']
                         #se obtine el id del adjunto del cuerpo del mensaje y se crea el folder con el nombre del proveedor
                             if 'attachmentId' in body:
