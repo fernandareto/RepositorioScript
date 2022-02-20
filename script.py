@@ -125,7 +125,7 @@ for index,date in enumerate(fechas):
     dateformat= datetime.strptime(date,"%d/%m/%Y").strftime(format)
     datetocompare = datetime.strptime(dateformat,format)
     identidadter = identificador[index]
-    daysactu = 365
+    
 
 #revisa si esos proveedores que estan con su fecha de vencimiento de aoc en 10 días ya fueron notificados:      
     if str(identidadter) not in listasincomas:
@@ -162,7 +162,8 @@ for index,date in enumerate(fechas):
                 message = service.users().messages().send(userId='me', body={'raw': raw_string}).execute()
                 
     else: 
-        print('ya fue notificado el proveedor')    
+        continue
+        #print('ya fue notificado el proveedor')    
       
 #hace la conexión a la BD para obtener los proveedores  que aún no se ha recibido correo
 conexion = mysql.connector.connect(host = 'sql10.freesqldatabase.com',port = 3306, user = 'sql10473104', password= 'WXqzNP2trR', database = 'sql10473104')
@@ -225,14 +226,14 @@ for proveedor in proveedores_notificados:
                                 media_body = MediaIoBaseUpload(fh, mimetype='document/pdf', chunksize=1024*1024, resumable=True)              
                                 file = service_drive.files().create(body=file_metadata,media_body=media_body,fields='id').execute() 
                                 #Actualiza la fecha de vencimiento de AoC a 1 año para tener el control del próximo vencimiento
+                                daysactu = 365
                                 dateactualizada =(datetocompare + timedelta(daysactu)) 
-                                 
                                 #agrega la información que se obtiene del correo a la BD y coloca en 1 el Estado de cada proveedor en la BD para identificar de cuales proveedores ya se obtuvo su AoC actualizado   
                                 cursorr.execute("UPDATE proveedores_notificados SET Estado='{}',Remitente='{}',Fecha_Respuesta_Proveedor='{}',Fecha_Actualizada_AoC='{}' WHERE identificador={}".format(1,frommail,datemail,str(dateactualizada),idproveedor))
                                 conexion.commit()                                       
     else: 
-        
-        print ('No hay mensajes recibidos por parte del proveedor')
+        continue
+        #print ('No hay mensajes recibidos por parte del proveedor')
         
 
 
