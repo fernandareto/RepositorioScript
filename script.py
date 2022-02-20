@@ -7,7 +7,6 @@ import datetime
 import gspread
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-import gspread 
 import pandas as pd
 import base64
 from email.mime.multipart import MIMEMultipart
