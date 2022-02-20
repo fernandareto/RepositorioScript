@@ -125,8 +125,8 @@ for index,date in enumerate(fechas):
     dateformat= datetime.strptime(date,"%d/%m/%Y").strftime(format)
     datetocompare = datetime.strptime(dateformat,format)
     identidadter = identificador[index]
-    
-    
+
+#revisa si esos proveedores que estan con su fecha de vencimiento de aoc en 10 días ya fueron notificados:      
     if str(identidadter) not in listasincomas:
     
         if  datetocompare <= (datetime.today() + timedelta(daysexpiration)) and datetocompare > datetime.today():
@@ -160,29 +160,27 @@ for index,date in enumerate(fechas):
                 raw_string = base64.urlsafe_b64encode(mimeMessage.as_bytes()).decode()
                 message = service.users().messages().send(userId='me', body={'raw': raw_string}).execute()
                 
-    else:
-        
+    else: 
         print('ya fue notificado el proveedor')    
-
-#print('searchmessage')        
-#hace la conexión a la BD para obtener los proveedores de los cuales no se ha recibido correo
+      
+#hace la conexión a la BD para obtener los proveedores  que aún no se ha recibido correo
 conexion = mysql.connector.connect(host = 'sql10.freesqldatabase.com',port = 3306, user = 'sql10473104', password= 'WXqzNP2trR', database = 'sql10473104')
 cursorr = conexion.cursor()
 cursorr.execute("SELECT identificador,nombre FROM proveedores_notificados WHERE Estado=0")
 proveedores_notificados=cursorr.fetchall()
 
-#recorre los id de los proveedores a los cuales se les notifico que su AoC esta pròximo a vencer
+#recorre los id de los proveedores a los cuales se les notifico que su AoC esta próximo a vencer y no han enviado su AoC actualizado
 for proveedor in proveedores_notificados:
     idproveedor = proveedor[0]
     nombreproveedor = proveedor[1]
     attachment='has:attachment'
     
-    #Busca los correos que se reciben con el asunto nombreproveedor+renovacion de AoC+idproveedor
+    #Busca los correos que se reciben con el asunto idproveedor+renovacion de AoC+nombreproveedor
     search_ids = service.users().messages().list(userId='me', q=(str(idproveedor)+'-renovacion de AoC-'+nombreproveedor)).execute()
     number_results = search_ids['resultSizeEstimate']
-    #print(number_results)
     
-    #Valida si encontro correos con el asunto 
+    
+    #Valida si encontro correos con el asunto especifíco
     if number_results > 1:
         idsmail= search_ids['messages']
         
@@ -190,7 +188,6 @@ for proveedor in proveedores_notificados:
             for search_id in idsmail:
                 messageid = search_id['id']
                 messagesubject = '(has:attachment)({0})'.format(messageid)
-                #print (messagesubject)
                 messageDetail = service.users().messages().get(userId='me',id=messageid,metadataHeaders=['parts']).execute()
                 messageDetailPayload =  messageDetail.get('payload')
                 headers = messageDetailPayload['headers']
@@ -201,55 +198,34 @@ for proveedor in proveedores_notificados:
                     for header in headers:
                         name = header.get("name")
                         value = header.get("value")
-                        if name.lower() == 'from':
-                                
-                            frommail=value
-                            #print(frommail)
-                        if name.lower() == "to":
-                                
+                        if name.lower() == 'from':                               
+                            frommail=value                        
+                        if name.lower() == "to":                               
                             tomail=value
-                            #print(tomail)
-                        if name.lower() == "date":
-                                
+                        if name.lower() == "date":  
                             datemail=value
-                            #print(datemail)
-
                         if header ['name'] == 'Subject':
                             if header['value']:
-                                messageSubject = '(renovacion de AoC) ({0})'.format(messageid)
-                                #print(messageSubject)
-                            
-                                            
-                        #agrega la información que se obtiene del correo a la BD y coloca en 1 el Estado de cada proveedor en la BD para identificar cuales ya dieron respuesta        
-                    
-                    
+                                messageSubject = '(renovacion de AoC) ({0})'.format(messageid)                                        
+                    #obtiene el cuerpo del mensaje para encontrar si el correo con ese asunto tiene un adjunto
                     if 'parts' in messageDetailPayload:
                         for msgPayload in messageDetailPayload['parts']:
                             mime_type = msgPayload['mimeType'] 
                             file_name = msgPayload['filename']
                             body = msgPayload['body']
-                        #se obtine el id del ajunto del body del mensaje:
+                        #se obtine el id del adjunto del cuerpo del mensaje y se crea el folder con el nombre del proveedor
                             if 'attachmentId' in body:
                                 attachment_id = body['attachmentId'] 
                                 folder_id = create_folder_in_drives(service_drive,nombreproveedor)['id']
-
                                 response = service.users().messages().attachments().get(userId='me', messageId=messageid,id=attachment_id).execute()
-
                                 file_data = base64.urlsafe_b64decode(response.get('data').encode('UTF-8'))     
                                 fh = io.BytesIO(file_data)
-
                                 file_metadata = { 'name': file_name,'parents': [folder_id]}
-                                
-
-                                media_body = MediaIoBaseUpload(fh, mimetype='document/pdf', chunksize=1024*1024, resumable=True)    
-                                
-                                file = service_drive.files().create(body=file_metadata,media_body=media_body,fields='id').execute()
-                                #print('creo')
-                    
+                                media_body = MediaIoBaseUpload(fh, mimetype='document/pdf', chunksize=1024*1024, resumable=True)              
+                                file = service_drive.files().create(body=file_metadata,media_body=media_body,fields='id').execute()   
+                                #agrega la información que se obtiene del correo a la BD y coloca en 1 el Estado de cada proveedor en la BD para identificar de cuales proveedores ya se obtuvo su AoC actualizado   
                                 cursorr.execute("UPDATE proveedores_notificados SET Estado='{}',Remitente='{}',Fecha_Respuesta_Proveedor='{}' WHERE identificador={}".format(1,frommail,datemail,idproveedor))
-                                conexion.commit()   
-                
-                                    
+                                conexion.commit()                                       
     else: 
         
         print ('No hay mensajes recibidos por parte del proveedor')
