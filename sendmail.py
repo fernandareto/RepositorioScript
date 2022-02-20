@@ -16,7 +16,6 @@ import sys
 import os
 
 
-
 CLIENT_SECRET_FILE = 'client_secret.json'
 API_NAME = 'gmail'
 API_VERSION = 'v1'

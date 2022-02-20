@@ -90,7 +90,7 @@ def create_folder_in_drives(service,folder_name,parent_folder = []):
 #autenticación para leer el archivo sheet de drive
 gc = gspread.service_account(filename='proyecto-341313-f7fe5a0f69b4.json')
 #abrir el archivo en drive donde se encuentran los datos
-sh = gc.open("datos")
+sh = gc.open("prueba")
 
 workshet = sh.get_worksheet(0)
 
@@ -125,6 +125,7 @@ for index,date in enumerate(fechas):
     dateformat= datetime.strptime(date,"%d/%m/%Y").strftime(format)
     datetocompare = datetime.strptime(dateformat,format)
     identidadter = identificador[index]
+    daysactu = 365
 
 #revisa si esos proveedores que estan con su fecha de vencimiento de aoc en 10 días ya fueron notificados:      
     if str(identidadter) not in listasincomas:
@@ -222,14 +223,20 @@ for proveedor in proveedores_notificados:
                                 fh = io.BytesIO(file_data)
                                 file_metadata = { 'name': file_name,'parents': [folder_id]}
                                 media_body = MediaIoBaseUpload(fh, mimetype='document/pdf', chunksize=1024*1024, resumable=True)              
-                                file = service_drive.files().create(body=file_metadata,media_body=media_body,fields='id').execute()   
+                                file = service_drive.files().create(body=file_metadata,media_body=media_body,fields='id').execute() 
+
+                                dateactualizada =(datetocompare + timedelta(daysactu)) 
+                                print (dateactualizada)  
                                 #agrega la información que se obtiene del correo a la BD y coloca en 1 el Estado de cada proveedor en la BD para identificar de cuales proveedores ya se obtuvo su AoC actualizado   
-                                cursorr.execute("UPDATE proveedores_notificados SET Estado='{}',Remitente='{}',Fecha_Respuesta_Proveedor='{}' WHERE identificador={}".format(1,frommail,datemail,idproveedor))
+                                cursorr.execute("UPDATE proveedores_notificados SET Estado='{}',Remitente='{}',Fecha_Respuesta_Proveedor='{}',Fecha_Actualizada_AoC='{}' WHERE identificador={}".format(1,frommail,datemail,str(dateactualizada),idproveedor))
                                 conexion.commit()                                       
     else: 
         
         print ('No hay mensajes recibidos por parte del proveedor')
         
+
+
+
 
     
         
