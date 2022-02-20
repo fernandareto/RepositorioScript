@@ -224,9 +224,9 @@ for proveedor in proveedores_notificados:
                                 file_metadata = { 'name': file_name,'parents': [folder_id]}
                                 media_body = MediaIoBaseUpload(fh, mimetype='document/pdf', chunksize=1024*1024, resumable=True)              
                                 file = service_drive.files().create(body=file_metadata,media_body=media_body,fields='id').execute() 
-
+                                #Actualiza la fecha de vencimiento de AoC a 1 año para tener el control del próximo vencimiento
                                 dateactualizada =(datetocompare + timedelta(daysactu)) 
-                                print (dateactualizada)  
+                                 
                                 #agrega la información que se obtiene del correo a la BD y coloca en 1 el Estado de cada proveedor en la BD para identificar de cuales proveedores ya se obtuvo su AoC actualizado   
                                 cursorr.execute("UPDATE proveedores_notificados SET Estado='{}',Remitente='{}',Fecha_Respuesta_Proveedor='{}',Fecha_Actualizada_AoC='{}' WHERE identificador={}".format(1,frommail,datemail,str(dateactualizada),idproveedor))
                                 conexion.commit()                                       
