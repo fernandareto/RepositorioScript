@@ -90,7 +90,7 @@ def create_folder_in_drives(service,folder_name,parent_folder = []):
 #autenticación para leer el archivo sheet de drive
 gc = gspread.service_account(filename='proyecto-341313-f7fe5a0f69b4.json')
 #abrir el archivo en drive donde se encuentran los datos
-sh = gc.open("prueba")
+sh = gc.open("datos")
 
 workshet = sh.get_worksheet(0)
 
