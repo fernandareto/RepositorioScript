@@ -110,12 +110,12 @@ serviciopro = (dataframe['servicio'])
 
 #conexión a la base de datos mysql que esta en la nube alojada en freesqldatabase y toma los id de los terceros que ya se notificaron en la primera ejecuciòn del script
 conexion = mysql.connector.connect(host = 'sql10.freesqldatabase.com',port = 3306, user = 'sql10473104', password= 'WXqzNP2trR', database = 'sql10473104')
-print(conexion)
+#print(conexion)
 cursorr = conexion.cursor()
 cursorr.execute("SELECT identificador FROM proveedores_notificados")
 identificadores=cursorr.fetchall()
 listasincomas = str(identificadores)[1:-1]
-print(listasincomas)
+
 
 
 #Busca de los terceros que tienen su fecha de vencimiento de aoc en 10 días a partir del día que se corre el script
@@ -125,7 +125,7 @@ for index,date in enumerate(fechas):
     dateformat= datetime.strptime(date,"%d/%m/%Y").strftime(format)
     datetocompare = datetime.strptime(dateformat,format)
     identidadter = identificador[index]
-    print (identidadter)
+    
     
     if str(identidadter) not in listasincomas:
     
@@ -138,10 +138,10 @@ for index,date in enumerate(fechas):
 
             if mailcontacto !='':
         #envia el mensaje a los terceros que se encuentran dentro del plazo de 10 días para vencer su AOC        
-                emailMsg = 'Su AoC Se encuentra proximo a vencer, por favor remita su AoC actualizado'
+                emailMsg = 'Su AoC se encuentra proximo a vencer, por favor remita su AoC actualizado'
                 mimeMessage = MIMEMultipart()
                 mimeMessage['to'] = mailcontacto
-                mimeMessage['subject'] = 'AoC Proximo a vencer '
+                mimeMessage['subject'] = 'AoC Proximo a vencer'
                 mimeMessage.attach(MIMEText(emailMsg, 'plain'))
                 raw_string = base64.urlsafe_b64encode(mimeMessage.as_bytes()).decode()
                 message = service.users().messages().send(userId='me', body={'raw': raw_string}).execute()
@@ -149,10 +149,10 @@ for index,date in enumerate(fechas):
                 cursorr = conexion.cursor()
                 cursorr.execute("INSERT INTO proveedores_notificados (identificador, nombre, servicio, fecha_vencimiento_aoc, correo_contacto, fecha_notificacion) VALUES ('{}','{}','{}','{}','{}','{}')".format(identidadter,terceropro,servicioter,datetocompare,mailcontacto,datesendmail))
                 conexion.commit()
-                print('correoenviado')
-            #Notifica cuando un correo no se encuentra el archivo sheet donde esta la información de los terceros
+                #print('correoenviado')
+            #Notifica cuando un correo no se encuentra el archivo sheet donde esta la información de los proveedores
             else:
-                emailMsg = 'No existe correo para contactar al proveedor' + terceropro
+                emailMsg = 'No existe correo para contactar al proveedor' + ' '+ terceropro + ' ' + 'con id' + ' '+ str(identidadter) 
                 mimeMessage = MIMEMultipart()
                 mimeMessage['to'] = 'retomeli2022@gmail.com'
                 mimeMessage['subject'] = 'No se logro notificar el vencimiento de AoC'
@@ -164,7 +164,7 @@ for index,date in enumerate(fechas):
         
         print('ya fue notificado el proveedor')    
 
-print('searchmessage')        
+#print('searchmessage')        
 #hace la conexión a la BD para obtener los proveedores de los cuales no se ha recibido correo
 conexion = mysql.connector.connect(host = 'sql10.freesqldatabase.com',port = 3306, user = 'sql10473104', password= 'WXqzNP2trR', database = 'sql10473104')
 cursorr = conexion.cursor()
@@ -180,7 +180,7 @@ for proveedor in proveedores_notificados:
     #Busca los correos que se reciben con el asunto nombreproveedor+renovacion de AoC+idproveedor
     search_ids = service.users().messages().list(userId='me', q=(str(idproveedor)+'-renovacion de AoC-'+nombreproveedor)).execute()
     number_results = search_ids['resultSizeEstimate']
-    print(number_results)
+    #print(number_results)
     
     #Valida si encontro correos con el asunto 
     if number_results > 1:
@@ -190,7 +190,7 @@ for proveedor in proveedores_notificados:
             for search_id in idsmail:
                 messageid = search_id['id']
                 messagesubject = '(has:attachment)({0})'.format(messageid)
-                print (messagesubject)
+                #print (messagesubject)
                 messageDetail = service.users().messages().get(userId='me',id=messageid,metadataHeaders=['parts']).execute()
                 messageDetailPayload =  messageDetail.get('payload')
                 headers = messageDetailPayload['headers']
@@ -204,20 +204,20 @@ for proveedor in proveedores_notificados:
                         if name.lower() == 'from':
                                 
                             frommail=value
-                            print(frommail)
+                            #print(frommail)
                         if name.lower() == "to":
                                 
                             tomail=value
-                            print(tomail)
+                            #print(tomail)
                         if name.lower() == "date":
                                 
                             datemail=value
-                            print(datemail)
+                            #print(datemail)
 
                         if header ['name'] == 'Subject':
                             if header['value']:
                                 messageSubject = '(renovacion de AoC) ({0})'.format(messageid)
-                                print(messageSubject)
+                                #print(messageSubject)
                             
                                             
                         #agrega la información que se obtiene del correo a la BD y coloca en 1 el Estado de cada proveedor en la BD para identificar cuales ya dieron respuesta        
@@ -244,7 +244,7 @@ for proveedor in proveedores_notificados:
                                 media_body = MediaIoBaseUpload(fh, mimetype='document/pdf', chunksize=1024*1024, resumable=True)    
                                 
                                 file = service_drive.files().create(body=file_metadata,media_body=media_body,fields='id').execute()
-                                print('creo')
+                                #print('creo')
                     
                                 cursorr.execute("UPDATE proveedores_notificados SET Estado='{}',Remitente='{}',Fecha_Respuesta_Proveedor='{}' WHERE identificador={}".format(1,frommail,datemail,idproveedor))
                                 conexion.commit()   
@@ -252,7 +252,7 @@ for proveedor in proveedores_notificados:
                                     
     else: 
         
-        print ('No hay mensajes recibidos por parte de los proveedores a los cuales se notifico que se va a vencer su AoC')
+        print ('No hay mensajes recibidos por parte del proveedor')
         
 
     
