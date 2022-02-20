@@ -3,7 +3,6 @@ import os
 from google_auth_oauthlib.flow import Flow, InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 import datetime 
 import gspread
 from dataclasses import dataclass
@@ -19,12 +18,12 @@ from mimetypes import MimeTypes
 from pickle import TRUE
 from re import T
 from urllib import response
-import base64
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from bs4 import BeautifulSoup
 import io
 import sys
+from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseDownload
+
 
 
 ####Codigo GOOGLE para obtener el servicio con el api de gmail###
@@ -75,6 +74,18 @@ API_VERSION = 'v1'
 SCOPES = ['https://mail.google.com/']
 
 service = Create_Service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
+
+
+CLIENT_SECRET_FILE = 'client_secret.json'
+API_NAME = 'drive'
+API_VERSION = 'v3'
+SCOPES = ['https://www.googleapis.com/auth/drive']
+service_drive = Create_Service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
+
+def create_folder_in_drives(service,folder_name,parent_folder = []):
+    file_metadata = {'name':folder_name, 'parents':parent_folder, 'mimeType':'application/vnd.google-apps.folder'}
+    file = service_drive.files().create(body=file_metadata,fields= 'id').execute()
+    return file
 
 #autenticación para leer el archivo sheet de drive
 gc = gspread.service_account(filename='proyecto-341313-f7fe5a0f69b4.json')
@@ -138,6 +149,7 @@ for index,date in enumerate(fechas):
                 cursorr = conexion.cursor()
                 cursorr.execute("INSERT INTO proveedores_notificados (identificador, nombre, servicio, fecha_vencimiento_aoc, correo_contacto, fecha_notificacion) VALUES ('{}','{}','{}','{}','{}','{}')".format(identidadter,terceropro,servicioter,datetocompare,mailcontacto,datesendmail))
                 conexion.commit()
+                print('correoenviado')
             #Notifica cuando un correo no se encuentra el archivo sheet donde esta la información de los terceros
             else:
                 emailMsg = 'No existe correo para contactar al proveedor' + terceropro
@@ -151,7 +163,8 @@ for index,date in enumerate(fechas):
     else:
         
         print('ya fue notificado el proveedor')    
-        
+
+print('searchmessage')        
 #hace la conexión a la BD para obtener los proveedores de los cuales no se ha recibido correo
 conexion = mysql.connector.connect(host = 'sql10.freesqldatabase.com',port = 3306, user = 'sql10473104', password= 'WXqzNP2trR', database = 'sql10473104')
 cursorr = conexion.cursor()
@@ -162,61 +175,81 @@ proveedores_notificados=cursorr.fetchall()
 for proveedor in proveedores_notificados:
     idproveedor = proveedor[0]
     nombreproveedor = proveedor[1]
+    attachment='has:attachment'
     
     #Busca los correos que se reciben con el asunto nombreproveedor+renovacion de AoC+idproveedor
-    search_ids = service.users().messages().list(userId='me', q=(nombreproveedor+'-renovacion de AoC-'+str(idproveedor))).execute()
+    search_ids = service.users().messages().list(userId='me', q=(str(idproveedor)+'-renovacion de AoC-'+nombreproveedor)).execute()
     number_results = search_ids['resultSizeEstimate']
-
+    print(number_results)
+    
     #Valida si encontro correos con el asunto 
-    if number_results == 1:
+    if number_results > 1:
         idsmail= search_ids['messages']
         
-        if len(idsmail)==1:
-            for msg_id in idsmail:
-                print (msg_id['id']) #obtiene el ID del mensaje que encontro
-
-            msg = service.users().messages().get(userId='me', id=msg_id['id'], format='full').execute()
-            # divide el mensaje que encontro
-            payload = msg['payload']
-            headers = payload.get("headers")
+        if len(idsmail)>1:
+            for search_id in idsmail:
+                messageid = search_id['id']
+                messagesubject = '(has:attachment)({0})'.format(messageid)
+                print (messagesubject)
+                messageDetail = service.users().messages().get(userId='me',id=messageid,metadataHeaders=['parts']).execute()
+                messageDetailPayload =  messageDetail.get('payload')
+                headers = messageDetailPayload['headers']
             
-            parts = payload.get("parts")[0]
-            data = parts['body']['data']
             
-            if headers:
-            # obtiene información del correo electronico encontrado
-                for header in headers:
-                    name = header.get("name")
-                    value = header.get("value")
-                    if name.lower() == 'from':
-                      
-                        frommail=value
-                        print(frommail)
-                    if name.lower() == "to":
-                       
-                        tomail=value
-                        print(tomail)
-                    if name.lower() == "subject":
-                       
-                        subjectmail=value
-                        print(subjectmail)
-                    if name.lower() == "date":
-                       
-                        datemail=value
-                        print(datemail)
+                if headers:
+                    # obtiene información del correo electronico encontrado
+                    for header in headers:
+                        name = header.get("name")
+                        value = header.get("value")
+                        if name.lower() == 'from':
+                                
+                            frommail=value
+                            print(frommail)
+                        if name.lower() == "to":
+                                
+                            tomail=value
+                            print(tomail)
+                        if name.lower() == "date":
+                                
+                            datemail=value
+                            print(datemail)
 
+                        if header ['name'] == 'Subject':
+                            if header['value']:
+                                messageSubject = '(renovacion de AoC) ({0})'.format(messageid)
+                                print(messageSubject)
+                            
+                                            
+                        #agrega la información que se obtiene del correo a la BD y coloca en 1 el Estado de cada proveedor en la BD para identificar cuales ya dieron respuesta        
+                    
+                    
+                    if 'parts' in messageDetailPayload:
+                        for msgPayload in messageDetailPayload['parts']:
+                            mime_type = msgPayload['mimeType'] 
+                            file_name = msgPayload['filename']
+                            body = msgPayload['body']
+                        #se obtine el id del ajunto del body del mensaje:
+                            if 'attachmentId' in body:
+                                attachment_id = body['attachmentId'] 
+                                folder_id = create_folder_in_drives(service_drive,nombreproveedor)['id']
+
+                                response = service.users().messages().attachments().get(userId='me', messageId=messageid,id=attachment_id).execute()
+
+                                file_data = base64.urlsafe_b64decode(response.get('data').encode('UTF-8'))     
+                                fh = io.BytesIO(file_data)
+
+                                file_metadata = { 'name': file_name,'parents': [folder_id]}
+                                
+
+                                media_body = MediaIoBaseUpload(fh, mimetype='document/pdf', chunksize=1024*1024, resumable=True)    
+                                
+                                file = service_drive.files().create(body=file_metadata,media_body=media_body,fields='id').execute()
+                                print('creo')
+                    
+                                cursorr.execute("UPDATE proveedores_notificados SET Estado='{}',Remitente='{}',Fecha_Respuesta_Proveedor='{}' WHERE identificador={}".format(1,frommail,datemail,idproveedor))
+                                conexion.commit()   
                 
-                data = data.replace("-","+").replace("_","/")
-                decoded_data = base64.b64decode(data)
-
-                soup = BeautifulSoup(decoded_data , "lxml")
-                body = soup.body()   
-                print(str(body))    
-                                  
-            #agrega la información que se obtiene del correo a la BD y coloca en 1 el Estado de cada proveedor en la BD para identificar cuales ya dieron respuesta        
-            cursorr.execute("UPDATE proveedores_notificados SET Estado='{}',Remitente='{}',Fecha_Respuesta_Proveedor='{}',Fecha_Actualizada_AOC='{}' WHERE identificador={}".format(1,frommail,datemail,str(body),idproveedor)) 
-            conexion.commit()   
-                  
+                                    
     else: 
         
         print ('No hay mensajes recibidos por parte de los proveedores a los cuales se notifico que se va a vencer su AoC')
